@@ -1,5 +1,5 @@
 from flask import Flask
-from datetime import dtetime
+from datetime import datetime
 from flask import render_template
 from flask import request
 from flask import redirect
@@ -7,14 +7,25 @@ from flask import redirect
 import requests
 import json
 import os
-import Pandas as pd
+import pandas as pd
+
+app = Flask(__name__, template_folder=os.getcwd())
+node_port_list = ['5000','5001','5002']
 
 @app.route('/', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST' :
+        print("login 버튼을 누름")
+        input_value = request.form.to_dict(flat=False)
         print("login 지갑주소 : ", input_value)
-        headers = {'Content_Type' : 'application/json; charset=utf-8'}
-        res = requests.get("http://localhost:5000/chain", headers=headers)
+        ## 노드 주소 랜덤 선정
+        node_id = random.choice(node_port_list)
+        
+        ### 기존 user 정보 확인
+        headers = {'Content-Type' : 'application/json; charset=utf-8'}
+        ## 선정된 노드 주소로 데이터 요청
+        res = requests.get("http://localhost:" +node_id + "/chain", headers=headers)
+        print("*"*8)
 
         status_json = json.loads(res.text)
         status_json['chain']
@@ -24,34 +35,34 @@ def login():
         tx_time_l = []
 
         for chain_index in range(len(status_json['chain'])) :
-            chain_tx = stauts_json['chain'][chain_index]['transactions']
+            chain_tx = status_json['chain'][chain_index]['transactions']
 
-            for each_tx in range(len(cahin_tx)) :
-                tx_amount_l.append(chain_tx[eacht_tx]['amount'])
-                tx_sender_l.append(chain_tx[eacht_tx]['sender'])
-                tx_reciv_l.append(chain_tx[eacht_tx]['reciv'])
-                tx_time_l.append(chain_tx[eacht_tx]['time'])
+            for each_tx in range(len(chain_tx)) :
+                tx_amount_l.append(chain_tx[each_tx]['amount'])
+                tx_sender_l.append(chain_tx[each_tx]['sender'])
+                tx_reciv_l.append(chain_tx[each_tx]['recipient'])
+                tx_time_l.append(chain_tx[each_tx]['timestama'])
 
         df_tx = pd.DataFrame()
-        df_tx['timestamp'] = tx_time_l
+        df_tx['timestama'] = tx_time_l
         df_tx['sender'] = tx_sender_l
         df_tx['recipient'] = tx_reciv_l
         df_tx['amount'] = tx_amount_l
         df_tx
 
-        df_sender = pd.DataFrame(df_tx.groupby('sender')['amount'].sum()).reset_index()
-        df_sender.columns = ['user', 'sender_amount']
-        df_received = pd.DataFrame(df_tx.groupby('recipient')['amount'].sum()).reset_index())
+        df_sended = pd.DataFrame(df_tx.groupby('sender')['amount'].sum()).reset_index()
+        df_sended.columns = ['user', 'sended_amount']
+        
+        df_received = pd.DataFrame(df_tx.groupby('recipient')['amount'].sum()).reset_index()
         df_received.columns = ['user', 'received_amount']
-        df_received
 
-        df_status = pd.merge(df_receivd, df_sended, on ='user', how = outer).fillna(0)
+        df_status = pd.merge(df_received, df_sended, on ='user', how = 'outer').fillna(0)
         df_status['balanc'] = df_status['received_amount'] - df_status['sended_amount']
         df_status
 
-        if df_status['user']==input_value['wallet_id'][0].sum() == 1 :
+        if (df_status['user']==input_value['wallet_id'][0]).sum() == 1 :
             print("로그인 성공")
-            return render_template("wallet.html", wallet_id = input_value['wallet_id'][0], wallet_value = df_status[df_status['user'] ==df_status['user'].iloc[0]['balance'].iloc[0]])
+            return render_template("walletScan.html", wallet_id = input_value['wallet_id'][0], wallet_value = df_status[df_status['user'] == df_status['user'].iloc[0]]['balanc'].iloc[0])
         else :
             return "잘못된 지갑주소입니다."
         
@@ -66,17 +77,24 @@ def wallet():
         print("Login Wallet ID : ", send_from)
 
         if send_value > 0:
-            print("Send Amout : ", send_value)
-            headers = {'Content-Type' : 'application/json; charset = utf-8'}
+            print(send_value)
+            ## transaction 입력하기
+            headers = {'Content-Type' : 'application/json; charset=utf-8'}
+            
+            ## 노드 주소 랜덤 선정
             data = {
-                "sender" : send_from,
-                "recipient" : send_target,
-                "amount" : send_value,
+                "sender": send_from,
+                "recipient": send_target,
+                "amount": send_value,
             }
-            requests.post("http://localhost:5000/transactions/new", headers=headers, data=json.dumps(data))
-            return "전송완료!!"
+            
+            ## 선정된 노드 주소로 데이터 요청
+            requests.post("http://localhost:" +node_id + "/transactions/new", headers=headers, data=json.dumps(data)).content
+            return "전송 완료!"
 
         else :
             return "0 pyBTC 이상 보내주세요!"
 
-    return render_template('wallet.html')
+    return render_template('walletScan.html')
+
+app.run(port=8081)

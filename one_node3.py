@@ -105,7 +105,7 @@ class Blockchain(object):
 
 blockchain = Blockchain()
 my_ip = '127.0.0.1'
-my_port = '5000'
+my_port = '5002'
 node_identifier = 'node_' + my_port
 mine_owner = 'master'
 mine_profit = 0.1
