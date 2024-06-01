@@ -21,6 +21,10 @@ class Blockchain(object):
     def last_block(self):
         return self.chain[-1]                             # 체인의 마지막 블록 가져오기!!
 
+    @property
+    def get_transaction(self):
+        return  len(self.current_transaction)
+    
     @staticmethod
     def valid_proof(last_proof, proof):
         guess = str(last_proof + proof).encode()          # 전 proof와 구할 proof 문자열 연결
@@ -107,6 +111,14 @@ values['amount'])
 
 @app.route('/mine', methods=['GET'])
 def mine():
+    transaction_len = blockchain.get_transaction
+    if transaction_len == 0 :
+        response = {
+            'message' : 'No transaction in node. Need making transaction ',
+            'transactions length' : transaction_len
+        }
+        return jsonify(response), 200
+    
     print("MINING STARTED")    
     last_block = blockchain.last_block
     last_proof = last_block['nonce']

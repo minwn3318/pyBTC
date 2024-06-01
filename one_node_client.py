@@ -14,7 +14,10 @@ while run_client :
     if select_command == '1' :
         print("블록체인을 가져오고 있습니다 잠시만 기다려 주십시오")
         res = requests.get("http://localhost:5000/chain", headers=headers)
-        print(json.loads(res.content))
+        try :
+            print(res.json())
+        except :
+            print("응답메시지에 오류가 생겼습니다")
 
     elif select_command == '2' :
         print("select 2")
@@ -35,13 +38,19 @@ while run_client :
         }
         print('거래내역을 생성중입니다 잠시만 기다려 주십시오')
         res = requests.post("http://localhost:5000/transactions/new", headers=headers, data=json.dumps(data)).content
-        print(json.loads(res))
+        try :
+            print(res.json())
+        except :
+            print("응답메시지에 오류가 생겼습니다")
         invaild_transaction = True
 
     elif select_command =='3' :
         print("블록생성 중입니다 잠시만 기다려주십시오")
         res = requests.get("http://localhost:5000/mine")
-        print(json.loads(res.content))
+        try :
+            print(res.json())
+        except :
+            print("응답메시지에 오류가 생겼습니다")
 
     elif select_command == '0' :
         print("클라이언트를 종료합니다")
