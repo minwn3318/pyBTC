@@ -10,7 +10,7 @@ while run_client :
 
     headers = {'Content-Type' : 'application/json; charset=utf-8'}
 
-    select_command = input("실행할 명령어를 선택해 주십시오 (1 = registe node) (2 = chain), (3 = transaction), (4 = mine), (0 = end client) : ")
+    select_command = input("실행할 명령어를 선택해 주십시오 (1 = registe node), (2 = chain), (3 = nodeList), (4 = transaction), (5 = transaction), (6 = mine), (0 = end client) : ")
     print(select_command)
     print("\n----------\n")
     if select_command == '1' :
@@ -63,15 +63,60 @@ while run_client :
             print("\n----------\n")
         invaild_transaction = True
 
-
     elif select_command == '3' :
+        while invaild_transaction :
+            try :
+                input_value = input("가져올 노드리스트의 노드 url주소(http://제외)를 입력하십시오 :")
+                chain_node = "http://" + input_value + "/nodeList"
+                print("노드주소 : ", chain_node)
+                print("\n----------\n")
+                invaild_transaction = False
+            except :
+                 print("입력한 내용의 입력 양식이 맞지 않습니다 다시 입력해주세요 : 3")
+                 print("입력내용 : ", input_value, chain_node)
+                 print("\n----------\n")
+
+        print("블록체인을 가져오고 있습니다 잠시만 기다려 주십시오")
+        res = requests.get(chain_node, headers=headers)
+        try :
+            print(res.json())
+            print("\n----------\n")
+        except :
+            print("잘못된 주소이거나 응답메시지에 오류가 생겼습니다 : 3")
+            print("\n----------\n")
+        invaild_transaction = True
+
+    elif select_command == '4' :
+        while invaild_transaction :
+            try :
+                input_value = input("가져올 트랜잭션의 노드 url주소(http://제외)를 입력하십시오 :")
+                chain_node = "http://" + input_value + "/transaction"
+                print("노드주소 : ", chain_node)
+                print("\n----------\n")
+                invaild_transaction = False
+            except :
+                 print("입력한 내용의 입력 양식이 맞지 않습니다 다시 입력해주세요 : 2")
+                 print("입력내용 : ", input_value, chain_node)
+                 print("\n----------\n")
+
+        print("블록체인을 가져오고 있습니다 잠시만 기다려 주십시오")
+        res = requests.get(chain_node, headers=headers)
+        try :
+            print(res.json())
+            print("\n----------\n")
+        except :
+            print("잘못된 주소이거나 응답메시지에 오류가 생겼습니다 : 4")
+            print("\n----------\n")
+        invaild_transaction = True
+
+    elif select_command == '5' :
         while invaild_transaction :
             try :
                 input_value = input("송신자아이디, 수신자아이디, 보내는 양('숫자') 순서로 공백(띄어쓰기)으로 구분하여 입력해주세요 : ").split()
                 print("\n----------\n")
                 input_value[2] = int(input_value[2])
                 input_node = input("트랜잭션을 생성할 블록체인의 노드 url주소(http://제외)를 입력하십시오 :")
-                chain_node = "http://" + input_node + "/chain"
+                chain_node = "http://" + input_node + "/transactions/new"
                 print("노드주소 : ", chain_node)
                 print("\n----------\n")
                 invaild_transaction = False
@@ -86,7 +131,7 @@ while run_client :
                 "amount": input_value[2],
         }
         print('거래내역을 생성중입니다 잠시만 기다려 주십시오')
-        res = requests.post("http://localhost:5000/transactions/new", headers=headers, data=json.dumps(data)).content
+        res = requests.post(chain_node, headers=headers, data=json.dumps(data)).content
         try :
             print(json.loads(res))
             print("\n----------\n")
@@ -95,11 +140,11 @@ while run_client :
             print("\n----------\n")
         invaild_transaction = True
 
-    elif select_command =='4' :
+    elif select_command =='6' :
         while invaild_transaction :
             try :
                 input_node = input("블록을 생성할 블록체인의 노드 url주소(http://제외)를 입력하십시오 :")
-                chain_node = "http://" + input_node + "/chain"
+                chain_node = "http://" + input_node + "/mine"
                 print("노드주소 : ", chain_node)
                 print("\n----------\n")
                 invaild_transaction = False
@@ -109,7 +154,7 @@ while run_client :
                  print("\n----------\n")
 
         print("블록생성 중입니다 잠시만 기다려주십시오")
-        res = requests.get("http://localhost:5000/mine")
+        res = requests.get(chain_node, headers=headers)
         try :
             print(res.json())
             print("\n----------\n")

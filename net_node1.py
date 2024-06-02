@@ -26,6 +26,13 @@ class Blockchain(object):
     def get_transaction(self):
         return  self.current_transaction
     
+    @property
+    def get_nodeList(self) :
+        node_list = []
+        for node in self.nodes :
+            node_list.append(node)
+        return node_list
+    
     @staticmethod
     def valid_proof(last_proof, proof):
         guess = str(last_proof + proof).encode()          # 전 proof와 구할 proof 문자열 연결
@@ -122,9 +129,27 @@ def full_chain():
     print("chain info requested!!")
     response = {
         'chain' : blockchain.chain, 
-        'length' : len(blockchain.chain), 
+        'length' : len(blockchain.chain) 
     }
     return jsonify(response), 200
+
+@app.route('/transaction', methods = ['GET'])
+def full_transaction():
+    print("transaction info requested!!")
+    response = {
+        'transaction' : blockchain.get_transaction,
+        'length' : len(blockchain.get_transaction)
+    }
+    return jsonify(response), 200
+
+@app.route('/nodeList', methods = ['GET'])
+def full_nodeList():
+    print(" info requested!!")
+    respones = {
+        'node_list' : blockchain.get_nodeList,
+        'length' : len(blockchain.get_nodeList)
+    }
+    return jsonify(respones), 200
 
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
@@ -141,7 +166,7 @@ def register_nodes():
         print("Node already registered")  # 이미 등록된 노드입니다.
         response = {
             'message' : 'Already Registered Node',
-            'total_nodes' : list(blockchain.nodes),
+            'total_nodes' : list(blockchain.nodes)
         }
 
     ## 중복  안되었다면
@@ -168,7 +193,7 @@ def register_nodes():
 
         response = {
             'message' : 'New nodes have been added',
-            'total_nodes' : list(blockchain.nodes),
+            'total_nodes' : list(blockchain.nodes)
         }
     return jsonify(response), 201
 
@@ -184,6 +209,19 @@ def new_transaction():
     index = blockchain.new_transaction(values['sender'],values['recipient'],values['amount'])
         
     response = {'message' : 'Transaction will be added to Block {%s}' % index}
+
+    if "type" not in values:  ## 신규로 추가된 경우 type 이라는 정보가 포함되어 없다. 해당 내용은 전파 필요
+        for node in blockchain.nodes:  # nodes에 저장된 모든 노드에 정보를 전달한다.
+            headers = {'Content-Type' : 'application/json; charset=utf-8'}
+            data = {
+                "sender": values['sender'],
+                "recipient": values['recipient'],
+                "amount": values['amount'],
+                "type" : "sharing"   # 전파이기에 sharing이라는 type 이 꼭 필요하다.
+            }
+            requests.post("http://" + node  + "/transactions/new", headers=headers, data=json.dumps(data))
+            print("share transaction to >>   ","http://" + node )
+            
     return jsonify(response), 201
 
 
@@ -212,16 +250,84 @@ def mine():
     block = blockchain.new_block(proof, previous_hash)
     print("MINING FINISHED")
 
-    response = {
-        'message' : 'new block found',
-        'index' : block['index'],
-        'transactions' : block['transactions'],
-        'nonce' : block['nonce'],
-        'previous_hash' : block['previous_hash']
-    }
+    for node in blockchain.nodes: # nodes에 연결된 모든 노드에 작업증명(PoW)가 완료되었음을 전파한다.
+        headers = {'Content-Type' : 'application/json; charset=utf-8'}
+        data = {
+            "miner_node":  'http://' + my_ip + ":" + my_port,
+            'new_nonce' : blockchain.last_block['nonce']
+        }
+            
+        alarm_res = requests.get("http://" + node  + "/nodes/resolve", headers=headers, data =json.dumps(data) ) 
+        
+        if "ERROR" not in alarm_res.text : # 전파 받은 노드의 응답에 ERROR라는 이야기가 없으면 (나의 PoW가 인정 받으면)
+            ## 정상 response
+            response = {
+                'message' : 'new block completed',
+                'index' : block['index'],
+                'transactions' : block['transactions'],
+                'nonce' : block['nonce'],
+                'previous_hash' : block['previous_hash']
+            }
+            
+        else : # 전파 받은 노드의 응답에 이상이 있음을 알린다면?
+            ## 내 PoW가 이상이 있을수 있기에 다시 PoW 진행!
+            block = blockchain.new_block(proof, previous_hash)
           
     return jsonify(response), 200
 
+@app.route('/nodes/resolve', methods=['GET'])
+def resolve():
+    requester_node_info =  request.get_json()
+    required = ['miner_node'] # 해당 데이터가 존재해야함
+    # 데이터가 없으면 에러를 띄움
+    if not all(k in requester_node_info for k in required):
+        return 'missing values', 400   
+    
+    
+    ## 그전에 우선 previous 에서 바뀐것이 있는지 점검하자!!
+    my_previous_hash =  blockchain.last_block['previous_hash']
+    my_previous_hash
+    
+    last_proof = blockchain.last_block['nonce']
+    
+    headers = {'Content-Type' : 'application/json; charset=utf-8'}
+    miner_chain_info = requests.get(requester_node_info['miner_node']  + "/chain", headers=headers)
+    ##초기 블록은 과거 이력 변조내역 확인 할 필요가 없다
+        
+    print("다른노드에서 요청이 온 블록, 검증 시작")
+    new_block_previous_hash = json.loads(miner_chain_info.text)['chain'][-2]['previous_hash']
+    # 내 노드의 전해시랑 새로만든에의 전해시가 같을떄!!! >> 정상
+    if my_previous_hash == new_block_previous_hash  and  \
+                hashlib.sha256(str(last_proof + int(requester_node_info['new_nonce'])).encode()).hexdigest()[:4] == "0000" : 
+                # 정말 PoW의 조건을 만족시켰을까? 검증하기
+        print("다른노드에서 요청이 온 블록, 검증결과 정상!!!!!!")
+
+        replaced = blockchain.resolve_conflicts() # 결과값 : True Flase  / True 면 내 블록에 길이가 짧아 대체되어야 한다.
+
+        # 체인 변경 알림 메시지
+        if replaced == True:
+            ## 내 체인이 짧아서 대체되어야 함
+            print("REPLACED length :",len(blockchain.chain))
+            response = {
+                'message' : 'Our chain was replaced >> ' +  my_ip + ":"+ my_port,
+                'new_chain' : blockchain.chain
+            }
+        else:
+            ## 내 체인이 제일 길어서 권위가 있음
+            response = {
+                'message' : 'Our chain is authoritative',
+                'chain' : blockchain.chain
+            }
+    #아니면 무엇인가 과거데이터가 바뀐것이다!!
+    else:
+        print("다른노드에서 요청이 온 블록, 검증결과 이상발생!!!!!!!!")
+        response = {
+            'message' : 'Our chain is authoritative>> ' +  my_ip + ":"+ my_port,
+            'chain' : blockchain.chain
+        }            
+
+
+    return jsonify(response), 200
 
 if __name__ == '__main__':
     app.run(host=my_ip, port=my_port)
