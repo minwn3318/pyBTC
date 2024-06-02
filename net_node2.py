@@ -1,0 +1,227 @@
+import hashlib # hash 함수용 sha256 사용할 라이브러리
+import json
+from time import time
+import random
+import requests
+from flask import Flask, request, jsonify
+from urllib.parse import urlparse
+
+class Blockchain(object):
+    
+    def __init__(self):
+        self.chain = []                                   # chain에 여러 block들 들어옴
+        self.current_transaction = []                     # 임시 transaction 넣어줌
+        self.nodes = set()                                # Node 목록을 보관
+        self.new_block(previous_hash=1, proof=100)        # genesis block 생성
+
+    @staticmethod
+    def hash(block):
+        block_string = json.dumps(block, sort_keys=True).encode() 
+        return hashlib.sha256(block_string).hexdigest()   # hash 라이브러리로 sha256 사용
+    @property
+    def last_block(self):
+        return self.chain[-1]                             # 체인의 마지막 블록 가져오기!!
+
+    @property
+    def get_transaction(self):
+        return  self.current_transaction
+    
+    @staticmethod
+    def valid_proof(last_proof, proof):
+        guess = str(last_proof + proof).encode()          # 전 proof와 구할 proof 문자열 연결
+        guess_hash = hashlib.sha256(guess).hexdigest()    # 이 hash 값 저장
+        return guess_hash[:4] == "0000"                  # 앞 4자리가 0000 이면 True (알맞은 nonce값을 찾음)
+
+    def pow(self, last_proof):
+        proof = random.randint(-1000000,1000000)
+        while self.valid_proof(last_proof, proof) is False: # valid proof 함수 활용(아래 나옴), 맞을 때까지 반복적으로 검증
+            proof = random.randint(-1000000,1000000)
+        return proof
+
+    def new_transaction(self, sender, recipient, amount):
+        self.current_transaction.append(
+            {
+                'sender' : sender, # 송신자
+                'recipient' : recipient, # 수신자
+                'amount' : amount, # 금액
+                'timestamp':time()
+            }
+        )
+        return self.last_block['index'] + 1   
+
+    def new_block(self, proof, previous_hash=None):
+        block = {
+            'index' : len(self.chain)+1,
+            'timestamp' : time(), # timestamp from 1970
+            'transactions' : self.current_transaction,
+            'nonce' : proof,
+            'previous_hash' : previous_hash or self.hash(self.chain[-1]),
+        }
+        self.current_transaction = []
+        self.chain.append(block)     
+        return block
+
+    def valid_chain(self, chain):
+        last_block = chain[0] 
+        current_index = 1
+
+        while current_index < len(chain): 
+            block = chain[current_index]
+            print('%s' % last_block)
+            print('%s' % block)
+            print("\n--------\n")
+            if block['previous_hash'] != self.hash(last_block):
+                return False
+            last_block = block
+            current_index += 1
+        return True
+    
+    def register_node(self, address): # url 주소를 넣게 됨
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc) # set 자료형태 안에 목록을 저장    
+        
+    ## resolve_conflicts 라는 함수로 다른노드와 블록길이를 비교 , 더 긴 블록을 인정한다.
+    def resolve_conflicts(self):
+        neighbours = self.nodes # 구동되는 노드들을 저장
+        new_block = None
+
+        max_length = len(self.chain) # 내 블록의 길이 저장
+        for node in neighbours:
+            node_url = "http://" + str(node.replace("0.0.0.0","localhost")) + '/chain' # url을 받아서 request 통해 체인 정보 저장
+            response = requests.get(node_url)
+            if response.status_code == 200: # 정상적으로 웹페이지와 교류가 되면 그 정보 저장
+                length = response.json()['length']
+                chain = response.json()['chain']
+                ## 다른노드의 길이(length)가 내 노드의 길이(max_length) 보다 길고 and 내 채인이 유효한 경우
+                if length > max_length and self.valid_chain(chain): # 긴 체인을 비교 >> 제일 긴 블록이 인정된다
+                    max_length = length
+                    ##  기존 노드의 정보보다 받은 정보가 최신이다. 전송 받은 블록 정보를 new_block 넣는다
+                    new_block = chain
+                ## 다른노드의 길이(length)가 내 노드의 길이(max_length) 보다 짧거나 or 내 체인이 유효하지 않은경우 
+                else:
+                    1==1  # 별도 작업 불필요
+            if new_block != None:
+                self.chain = new_block  # 기존 블록 정보가 잘못된 것을 인정하고 검증된 블록정보로 바꾼다.
+                return True
+
+            return False
+            
+blockchain = Blockchain()
+my_ip = '127.0.0.1'
+my_port = '5001'
+node_identifier = 'node_'+my_port
+mine_owner = 'master02'
+mine_profit = 0.1
+
+app = Flask(__name__)
+
+headers = {'Content-Type' : 'application/json; charset=utf-8'}
+
+@app.route('/chain', methods=['GET'])
+def full_chain():
+    print("chain info requested!!")
+    response = {
+        'chain' : blockchain.chain, 
+        'length' : len(blockchain.chain), 
+    }
+    return jsonify(response), 200
+
+@app.route('/nodes/register', methods=['POST'])
+def register_nodes():
+    values = request.get_json() # json 형태로 보내면 노드가 저장이 됨
+    print("register nodes !!! : ", values)
+    registering_node =  values.get('nodes')
+    print(registering_node)
+    if registering_node == None: # 요청된 node 값이 없다면! 
+        return "Error: Please supply a valid list of nodes", 400
+     
+    ## 요청받은 노드드이 이미 등록된 노드와 중복인지 검사
+    ## 중복인인 경우
+    if registering_node.split("//")[1] in blockchain.nodes:
+        print("Node already registered")  # 이미 등록된 노드입니다.
+        response = {
+            'message' : 'Already Registered Node',
+            'total_nodes' : list(blockchain.nodes),
+        }
+
+    ## 중복  안되었다면
+    else:  
+        # 내 노드리스트에 추가
+        blockchain.register_node(registering_node) 
+        
+        ## 이 후 해당 노드에 내정보를  등록하기
+        data = {
+            "nodes": 'http://' + my_ip + ":" + my_port
+        }
+        print("MY NODE INFO " , 'http://' + my_ip + ":" + my_port)
+        requests.post( registering_node + "/nodes/register", headers=headers, data=json.dumps(data))
+        
+        # 이후 주변 노드들에도 새로운 노드가 등장함을 전파
+        for add_node in blockchain.nodes:
+            if add_node != registering_node.split("//")[1]:
+                print('add_node : ', add_node)
+                ## 노드 등록하기
+                data = {
+                   "nodes": registering_node
+                }
+                requests.post('http://' + add_node   + "/nodes/register", headers=headers, data=json.dumps(data))
+
+        response = {
+            'message' : 'New nodes have been added',
+            'total_nodes' : list(blockchain.nodes),
+        }
+    return jsonify(response), 201
+
+@app.route('/transactions/new', methods=['POST'])
+def new_transaction():
+    values = request.get_json() 
+    print("transactions_new!!! : ", values)
+    required = ['sender', 'recipient', 'amount'] 
+
+    if not all(k in values for k in required):
+        return 'missing values', 400
+
+    index = blockchain.new_transaction(values['sender'],values['recipient'],values['amount'])
+        
+    response = {'message' : 'Transaction will be added to Block {%s}' % index}
+    return jsonify(response), 201
+
+
+@app.route('/mine', methods=['GET'])
+def mine():
+    transaction_len = len(blockchain.get_transaction)
+    if transaction_len == 0 :
+        response = {
+            'message' : 'No transaction in node. Need making transaction ',
+            'transactions length' : transaction_len
+        }
+        return jsonify(response), 200
+    
+    print("MINING STARTED")    
+    last_block = blockchain.last_block
+    last_proof = last_block['nonce']
+    proof = blockchain.pow(last_proof)  
+
+    blockchain.new_transaction(
+        sender=mine_owner, 
+        recipient=node_identifier, 
+        amount=mine_profit # coinbase transaction 
+    )
+ 
+    previous_hash = blockchain.hash(last_block)
+    block = blockchain.new_block(proof, previous_hash)
+    print("MINING FINISHED")
+
+    response = {
+        'message' : 'new block found',
+        'index' : block['index'],
+        'transactions' : block['transactions'],
+        'nonce' : block['nonce'],
+        'previous_hash' : block['previous_hash']
+    }
+          
+    return jsonify(response), 200
+
+
+if __name__ == '__main__':
+    app.run(host=my_ip, port=my_port)
