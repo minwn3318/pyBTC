@@ -21,17 +21,6 @@ class Blockchain(object):
     @property
     def last_block(self):
         return self.chain[-1]                             # 체인의 마지막 블록 가져오기!!
-
-    @property
-    def get_transaction(self):
-        return  self.current_transaction
-    
-    @property
-    def get_nodeList(self) :
-        node_list = []
-        for node in self.nodes :
-            node_list.append(node)
-        return node_list
     
     @staticmethod
     def valid_proof(last_proof, proof):
@@ -133,24 +122,6 @@ def full_chain():
     }
     return jsonify(response), 200
 
-@app.route('/transaction', methods = ['GET'])
-def full_transaction():
-    print("transaction info requested!!")
-    response = {
-        'transaction' : blockchain.get_transaction,
-        'length' : len(blockchain.get_transaction)
-    }
-    return jsonify(response), 200
-
-@app.route('/nodeList', methods = ['GET'])
-def full_nodeList():
-    print(" info requested!!")
-    respones = {
-        'node_list' : blockchain.get_nodeList,
-        'length' : len(blockchain.get_nodeList)
-    }
-    return jsonify(respones), 200
-
 @app.route('/nodes/register', methods=['POST'])
 def register_nodes():
     values = request.get_json() # json 형태로 보내면 노드가 저장이 됨
@@ -226,15 +197,7 @@ def new_transaction():
 
 
 @app.route('/mine', methods=['GET'])
-def mine():
-    transaction_len = len(blockchain.get_transaction)
-    if transaction_len == 0 :
-        response = {
-            'message' : 'No transaction in node. Need making transaction ',
-            'transactions length' : transaction_len
-        }
-        return jsonify(response), 200
-    
+def mine():    
     print("MINING STARTED")    
     last_block = blockchain.last_block
     last_proof = last_block['nonce']
