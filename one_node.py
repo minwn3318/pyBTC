@@ -1,6 +1,7 @@
 import hashlib # hash 함수용 sha256 사용할 라이브러리
 import json
-from time import time
+import time
+import datetime
 import random
 import requests
 from flask import Flask, request, jsonify
@@ -33,13 +34,14 @@ class Blockchain(object):
             proof = random.randint(-1000000,1000000)
         return proof
 
-    def new_transaction(self, sender, recipient, amount):
+    def new_transaction(self, sender, recipient, amount, smart_contract):
         self.current_transaction.append(
             {
                 'sender' : sender, # 송신자
                 'recipient' : recipient, # 수신자
                 'amount' : amount, # 금액
-                'timestamp':time()
+                'timestamp':time.time(),
+                'smart_contract' : smart_contract
             }
         )
         return self.last_block['index'] + 1   
@@ -47,11 +49,12 @@ class Blockchain(object):
     def new_block(self, proof, previous_hash=None):
         block = {
             'index' : len(self.chain)+1,
-            'timestamp' : time(), # timestamp from 1970
+            'timestamp' : time.time(), # timestamp from 1970
             'transactions' : self.current_transaction,
             'nonce' : proof,
             'previous_hash' : previous_hash or self.hash(self.chain[-1]),
         }
+        block['hash'] = self.hash(block)
         self.current_transaction = []
         self.chain.append(block)     
         return block
@@ -66,6 +69,10 @@ class Blockchain(object):
             print('%s' % block)
             print("\n--------\n")
             if block['previous_hash'] != self.hash(last_block):
+                return False
+            block_copy = block.copy()
+            block_copy.pop('hash')
+            if block['hash'] != self.hash(block_copy) :
                 return False
             last_block = block
             current_index += 1
@@ -93,13 +100,16 @@ def full_chain():
 def new_transaction():
     values = request.get_json() 
     print("transactions_new!!! : ", values)
-    required = ['sender', 'recipient', 'amount'] 
+    required = ['sender', 'recipient', 'amount', 'smart_contract'] 
 
     if not all(k in values for k in required):
         return 'missing values', 400
 
+    contract_address = hashlib.sha256(str(datetime.datetime.now()).encode()).hexdigest()
+    values['smart_contract']['contract_address'] = contract_address
+
     index = blockchain.new_transaction(values['sender'],values['recipient'],
-values['amount'])
+values['amount'], values['smart_contract'])
         
     response = {'message' : 'Transaction will be added to Block {%s}' % index}
     return jsonify(response), 201
@@ -115,7 +125,8 @@ def mine():
     blockchain.new_transaction(
         sender=mine_owner, 
         recipient=node_identifier, 
-        amount=mine_profit # coinbase transaction 
+        amount=mine_profit, # coinbase transaction 
+        smart_contract= {'contract_address' : 0}
     )
  
     previous_hash = blockchain.hash(last_block)
@@ -127,7 +138,8 @@ def mine():
         'index' : block['index'],
         'transactions' : block['transactions'],
         'nonce' : block['nonce'],
-        'previous_hash' : block['previous_hash']
+        'previous_hash' : block['previous_hash'],
+        'hash' : block['hash']
     }
           
     return jsonify(response), 200
