@@ -39,7 +39,7 @@ while run_client :
         print('거래내역을 생성중입니다 잠시만 기다려 주십시오')
         res = requests.post("http://localhost:5000/transactions/new", headers=headers, data=json.dumps(data)).content
         try :
-            print(res.json())
+            print(res)
         except :
             print("응답메시지에 오류가 생겼습니다")
         invaild_transaction = True
