@@ -21,10 +21,18 @@ class Blockchain(object):
     def hash(block):
         block_string = json.dumps(block, sort_keys=True).encode() 
         return hashlib.sha256(block_string).hexdigest()   # hash �씪�씠釉뚮윭由щ줈 sha256 �궗�슜
+    
     @property
     def last_block(self):
         return self.chain[-1]                             # 泥댁씤�쓽 留덉��留� 釉붾줉 媛��졇�삤湲�!!
 
+    @property
+    def get_nodeList(self) :
+        node_list = []
+        for node in self.nodes :
+            node_list.append(node)
+        return node_list
+    
     @property
     def get_transaction(self):
         return  len(self.current_transaction)
@@ -130,7 +138,7 @@ class Blockchain(object):
                     return
         return     
         
-my_ip = '0.0.0.0'
+my_ip = '127.0.0.1'
 my_port = '5000'
 node_identifier = 'node_'+my_port
 mine_owner = 'master'
@@ -148,6 +156,24 @@ def full_chain():
         'length' : len(blockchain.chain), 
     }
     return jsonify(response), 200
+
+@app.route('/transaction', methods = ['GET'])
+def full_transaction():
+    print("transaction info requested!!")
+    response = {
+        'transaction' : blockchain.get_transaction,
+        'length' : len(blockchain.get_transaction)
+    }
+    return jsonify(response), 200
+
+@app.route('/nodeList', methods = ['GET'])
+def full_nodeList():
+    print(" info requested!!")
+    respones = {
+        'node_list' : blockchain.get_nodeList,
+        'length' : len(blockchain.get_nodeList)
+    }
+    return jsonify(respones), 200
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():

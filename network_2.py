@@ -28,7 +28,14 @@ class Blockchain(object):
     @property
     def get_transaction(self):
         return  len(self.current_transaction)
-    
+
+    @property
+    def get_nodeList(self) :
+        node_list = []
+        for node in self.nodes :
+            node_list.append(node)
+        return node_list
+        
     @staticmethod
     def valid_proof(last_proof, proof):
         guess = str(last_proof + proof).encode()          # �쟾 proof��� 援ы븷 proof 臾몄옄�뿴 �뿰寃�
@@ -130,7 +137,7 @@ class Blockchain(object):
                     return
         return     
         
-my_ip = '0.0.0.0'
+my_ip = '127.0.0.1'
 my_port = '5001'
 node_identifier = 'node_'+my_port
 mine_owner = 'master'
@@ -148,6 +155,24 @@ def full_chain():
         'length' : len(blockchain.chain), 
     }
     return jsonify(response), 200
+
+@app.route('/transaction', methods = ['GET'])
+def full_transaction():
+    print("transaction info requested!!")
+    response = {
+        'transaction' : blockchain.get_transaction,
+        'length' : len(blockchain.get_transaction)
+    }
+    return jsonify(response), 200
+
+@app.route('/nodeList', methods = ['GET'])
+def full_nodeList():
+    print(" info requested!!")
+    respones = {
+        'node_list' : blockchain.get_nodeList,
+        'length' : len(blockchain.get_nodeList)
+    }
+    return jsonify(respones), 200
 
 @app.route('/transactions/new', methods=['POST'])
 def new_transaction():
