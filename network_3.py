@@ -50,7 +50,7 @@ class Blockchain(object):
         time.sleep(1)
 
         for target_node in blockchain.nodes:            # 다른 노드들도 pick_winner 진행 
-            print(target_node)
+            print("self pos : ",target_node)
             headers = {'Content-Type' : 'application/json; charset=utf-8'}
             res = requests.get('http://' + target_node   + "/nodes/pick_winner", headers=headers)
             winner_info = json.loads(res.content)  # 근처 노드들 선정결과 받아와서
@@ -102,8 +102,8 @@ class Blockchain(object):
         self.chain.append(block)     
         return block
 
-    def valid_chain(self, chain):
-        last_block = chain[0] 
+    def is_chain_valid(self, chain):           
+        last_block = chain['chain'][0]
         current_index = 1
 
         while current_index < len(chain): 
@@ -115,6 +115,7 @@ class Blockchain(object):
                 return False
             last_block = block
             current_index += 1
+            
         return True
     
     def register_node(self, address): # url 주소를 넣게 됨
@@ -140,10 +141,10 @@ class Blockchain(object):
 my_ip = '127.0.0.1'
 my_port = '5002'
 node_identifier = 'node_'+my_port
-mine_owner = 'master'
+mine_owner = 'master003'
 mine_profit = 0.1
 
-blockchain = Blockchain(account_name=mine_owner, account_weight= 100)
+blockchain = Blockchain(account_name=mine_owner, account_weight= 8)
 
 app = Flask(__name__)
 
@@ -160,8 +161,8 @@ def full_chain():
 def full_transaction():
     print("transaction info requested!!")
     response = {
-        'transaction' : blockchain.get_transaction,
-        'length' : len(blockchain.get_transaction)
+        'transaction' : blockchain.current_transaction,
+        'length' : blockchain.get_transaction
     }
     return jsonify(response), 200
 
@@ -185,7 +186,7 @@ def new_transaction():
         return 'missing values', 400
 
     index = blockchain.new_transaction(values['sender'],values['recipient'],
-values['amount'], values['smart_contract'])
+values['amount'])
         
     response = {'message' : 'Transaction will be added to Block {%s}' % index}
 
@@ -232,7 +233,6 @@ def mine():
             sender="mining_profit", 
             recipient=final_winner, 
             amount=mine_profit, # coinbase transaction 
-            smart_contract={"contract_address":"mining_profit"}, 
         )
 
         previous_hash = blockchain.hash(blockchain.chain[-1])
@@ -328,23 +328,25 @@ def pick_winner():
     
     candidate_list = []  # POS 대상자를 뽑을 전체 풀!!
     for w in range(blockchain.account_weight):  # 나의 노드들의 weight 수만큼 추가
-        print('5002 : ', w)
+        print('route 5002 : ', w)
         candidate_list.append(blockchain.account_name)
 
     for target_node in blockchain.nodes:            # 근처 노드들의 weight 수만큼 추가
-        print(target_node)
+        print("route pos:",target_node)
         
         headers = {'Content-Type' : 'application/json; charset=utf-8'}
         res = requests.get('http://' + target_node   + "/nodes/node_weight", headers=headers)
         target_node_info = json.loads(res.content)
                 
         for repeated in range(target_node_info['account_weight']):
+            print('repeate : ', repeated)
+            print('name : ', target_node_info['account_name'])
             candidate_list.append(target_node_info['account_name'])
 
     random.shuffle(candidate_list)       #  랜덤으로 섞고!
     for x in  candidate_list:           #  첫번째 node를 winner로 선정
         winner  = x
-        print("WINNER SELECTED 5002: ", winner)
+        print("WINNER SELECTED 5002-: ", winner)
         break
 
     
@@ -352,6 +354,7 @@ def pick_winner():
         'winner' : winner, 
     }
     return jsonify(response), 200
+
 
 if __name__ == '__main__':
     app.run(host=my_ip, port=my_port)
