@@ -144,6 +144,5 @@ def mine():
           
     return jsonify(response), 200
 
-
 if __name__ == '__main__':
     app.run(host=my_ip, port=my_port)
