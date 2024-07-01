@@ -80,7 +80,7 @@ class Blockchain(object):
     
 blockchain = Blockchain()
 my_ip = '0.0.0.0'
-my_port = '5000'
+my_port = '5001'
 node_identifier = 'node_'+my_port
 mine_owner = 'master'
 mine_profit = 0.1
@@ -112,6 +112,7 @@ def new_transaction():
 values['amount'], values['smart_contract'])
         
     response = {'message' : 'Transaction will be added to Block {%s}' % index}
+    requests.get("http://localhost:5001/mine")
     return jsonify(response), 201
 
 
@@ -121,13 +122,6 @@ def mine():
     last_block = blockchain.last_block
     last_proof = last_block['nonce']
     proof = blockchain.pow(last_proof)  
-
-    blockchain.new_transaction(
-        sender=mine_owner, 
-        recipient=node_identifier, 
-        amount=mine_profit, # coinbase transaction 
-        smart_contract= {'contract_address' : 0}
-    )
  
     previous_hash = blockchain.hash(last_block)
     block = blockchain.new_block(proof, previous_hash)
