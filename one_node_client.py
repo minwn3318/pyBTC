@@ -33,7 +33,30 @@ while run_client :
                 "recipient": input_value[1],
                 "amount": input_value[2],
         "smart_contract": {
-                           "contract_code" :"token_name = 'pyTOKEN' \ntoken_total_volume = 100000" 
+                           "contract_code" :"token_name = 'pyTOKEN' \ntoken_total_volume = 100000\ntoken_owner = {'token_maker' : 10000, 'user' : 300, 'user2' : 200 }",
+                           "contract_function_getBalance" :"""
+def get_balance(user_id):
+    print('{} Balance is : '.format(user_id), token_owner[user_id])
+    return token_owner[user_id]
+""",
+                           "contract_function_sendToken" :"""
+def send_token(sender,recipent,amount):
+    if sender in token_owner.keys():
+        if get_balance(sender) > amount:
+            token_owner[sender]  = token_owner[sender] - amount
+            if recipent in token_owner.keys():
+                token_owner[recipent]  = token_owner[recipent] + amount
+            else :
+                token_owner[recipent]  =  amount
+            print("Transaction Completed")
+            get_balance(sender) 
+            get_balance(recipent) 
+
+        else:
+            return "Insufficient Balance"
+    else:
+        return "Unavailable Sender id"
+"""
                            }
                 }
                 
@@ -63,7 +86,16 @@ while run_client :
             for _tx in _block['transactions']:
                 if _tx['smart_contract']['contract_address'] == input_value:
                     exec( _tx['smart_contract']['contract_code'])
-                    print(token_name , "/ ", token_total_volume  )
+                    print(token_name)
+                    print(token_total_volume)
+                    exec(_tx['smart_contract']['contract_function_getBalance'])
+                    get_balance('token_maker')
+                    get_balance('user')
+                    exec(_tx['smart_contract']['contract_function_sendToken'])
+                    send_token('token_maker','user',50)
+                    send_token('token_maker','user2',3000)
+                    get_balance('user2')
+
                     break       
         invaild_transaction = True       
 
