@@ -33,7 +33,10 @@ while run_client :
                 "recipient": input_value[1],
                 "amount": input_value[2],
         "smart_contract": {
-                           "contract_code" :"print('Hello World!')" 
+                           "contract_code" :
+                           """myNFT = {'NFT_NAME' : 'SMARTCONTACT_NFT',
+                           'NFT_URL' : 'https://blog.kakaocdn.net/dn/HDY7T/btrY2our4Rw/Fw6bz0QroBUp1YxglkkwEK/img.webp'
+                           }""" 
                            }
                 }
                 
