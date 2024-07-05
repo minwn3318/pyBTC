@@ -33,7 +33,7 @@ while run_client :
                 "recipient": input_value[1],
                 "amount": input_value[2],
         "smart_contract": {
-                           "contract_code" :"print('Hello World!')" 
+                           "contract_code" :"token_name = 'pyTOKEN' \ntoken_total_volume = 100000" 
                            }
                 }
                 
@@ -63,6 +63,7 @@ while run_client :
             for _tx in _block['transactions']:
                 if _tx['smart_contract']['contract_address'] == input_value:
                     exec( _tx['smart_contract']['contract_code'])
+                    print(token_name , "/ ", token_total_volume  )
                     break       
         invaild_transaction = True       
 
