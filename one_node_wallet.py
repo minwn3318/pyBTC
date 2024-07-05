@@ -86,3 +86,5 @@ def wallet():
             return "0 pyBTC 이상 보내주세요!"
         
     return render_template('wallet.html')
+
+app.run()
